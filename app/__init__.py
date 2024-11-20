@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from config import Config
 from flask_login import LoginManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
 
 # Initialize extensions
@@ -11,6 +13,11 @@ login_manager.login_view = 'main.login'  # Redirect to login page if not authent
 
 db = SQLAlchemy()
 migrate = Migrate()
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri="memory://",
+    default_limits=["200 per day", "50 per hour"]
+)
 
 def create_app():
     app = Flask(__name__)
@@ -20,6 +27,7 @@ def create_app():
     db.init_app(app)  # Initialize SQLAlchemy with the Flask app
     migrate.init_app(app, db)  # Set up Flask-Migrate for database migrations
     login_manager.init_app(app)  # Initialize Flask-Login for authentication
+    limiter.init_app(app)  # Initialize Flask-Limiter
 
     # Add the user loader function for Flask-Login
     @login_manager.user_loader

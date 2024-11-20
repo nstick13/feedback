@@ -6,6 +6,8 @@ from flask_login import login_user, login_required, current_user, logout_user
 from flask import request, redirect, url_for, flash
 from werkzeug.security import generate_password_hash
 import traceback
+from .ai_services import init_feedback_coach
+from . import limiter
 
 main = Blueprint('main', __name__)
 
@@ -121,56 +123,55 @@ def logout():
     return redirect(url_for('main.home'))
 
 @main.route('/submit-feedback-request', methods=['POST'])
+@login_required
 def submit_feedback_request():
-    from flask import request, jsonify
-    from app.models import FeedbackRequest, db
-    from datetime import datetime, timedelta
-    from .email import send_email
-
-    # Parse JSON data from the frontend
-    data = request.get_json()
-    # Debugging: Log the received data
-    print("Received Data:", data)
-    recipient_name = data.get('recipient')
-    recipient_email = data.get('email')
-    # Debugging: Log specific fields
-    print("Recipient Name:", recipient_name)
-    print("Recipient Email:", recipient_email)
-
-    # Check if recipient_email is provided
-    if not recipient_email:
-        return jsonify({"error": "Recipient email is required"}), 400
-
-    # Dynamic data for the email
-    dynamic_data = {
-        'requestor_name': 'Nathan',  # Replace with logged-in user later
-        'feedback_link': 'https://example.com/feedback/123',  # Replace with a real link later
-    }
-
-    # Create a new feedback request
-    feedback_request = FeedbackRequest(
-        requestor_id=1,  # Replace with actual user ID when authentication is implemented
-        request_recipient=recipient_name,
-        recipient_email=recipient_email,
-        created_at=datetime.utcnow(),
-        expires_at=datetime.utcnow() + timedelta(days=30),  # Default expiration in 30 days
-        unique_link=f"https://your-app.com/feedback/willreplacelater",  # Replace with actual link generation logic
-    )
-
-    # Save the request to the database
     try:
-        db.session.add(feedback_request)
+        data = request.get_json()
+        request_id = data.get('request_id')
+        recipient_email = data.get('recipient_email')
+        personal_message = data.get('personal_message')
+
+        # Get the existing feedback request
+        feedback_request = FeedbackRequest.query.get_or_404(request_id)
+        
+        # Verify ownership
+        if feedback_request.requestor_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+
+        # Update the feedback request
+        feedback_request.recipient_email = recipient_email
+        feedback_request.status = 'pending'
+        feedback_request.expires_at = datetime.utcnow() + timedelta(days=30)
+        feedback_request.unique_link = f"https://wdtt.io/feedback/{feedback_request.id}"  # You'll need to update this with your actual domain
+
+        # Send email
+        dynamic_data = {
+            'requestor_name': current_user.full_name,
+            'feedback_link': feedback_request.unique_link,
+            'personal_message': personal_message if personal_message else ''
+        }
+
         db.session.commit()
+        
         email_status = send_email(recipient_email, dynamic_data)
         if "Status: 202" in email_status:
-            return jsonify({"status": "success", "message": "Feedback request sent successfully!"}), 201
+            return jsonify({
+                'success': True,
+                'message': 'Feedback request sent successfully!'
+            })
         else:
-            print("Unexpected Email Status Response:", email_status)  # Debugging log
-        return jsonify({"status": "error", "message": f"Email failed with response: {email_status}"}), 400
+            return jsonify({
+                'success': False,
+                'message': f'Failed to send email: {email_status}'
+            }), 500
+
     except Exception as e:
-        print("Error in submit-feedback-request:", str(e))  # Log error details
+        print(f"Error in submit_feedback_request: {str(e)}")
         db.session.rollback()
-        return jsonify({"status": "error", "message": "Database or server error occurred."}), 500
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred while processing your request'
+        }), 500
 
 @main.route('/dashboard')
 @login_required
@@ -203,8 +204,105 @@ def view_feedback(request_id):
     return jsonify(feedback_data)
 
 @main.route('/request-feedback')
+@login_required
 def request_feedback():
     return render_template('request_feedback.html')
+
+@main.route('/api/start-feedback-conversation', methods=['POST'])
+@login_required
+@limiter.limit("10 per hour")
+def start_feedback_conversation():
+    try:
+        coach = init_feedback_coach()
+        thread_id = coach.create_thread()
+        
+        # Store thread_id in session for later use
+        feedback_request = FeedbackRequest(
+            requestor_id=current_user.id,
+            request_recipient='',  # Will be filled later
+            recipient_email='',    # Will be filled later
+            status='draft',
+            session_data=thread_id
+        )
+        db.session.add(feedback_request)
+        db.session.commit()
+        
+        # Get initial response from assistant
+        response = coach.get_assistant_response(thread_id)
+        
+        return jsonify({
+            'success': True,
+            'message': response,
+            'request_id': feedback_request.id
+        })
+    except Exception as e:
+        print(f"Error starting conversation: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to start conversation'
+        }), 500
+
+@main.route('/api/send-message', methods=['POST'])
+@login_required
+@limiter.limit("30 per hour")
+def send_message():
+    try:
+        data = request.json
+        request_id = data.get('request_id')
+        message = data.get('message')
+        
+        feedback_request = FeedbackRequest.query.get_or_404(request_id)
+        if feedback_request.requestor_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+        
+        thread_id = feedback_request.session_data
+        coach = init_feedback_coach()
+        
+        # Send message and get response
+        coach.add_message(thread_id, message)
+        response = coach.get_assistant_response(thread_id)
+        
+        return jsonify({
+            'success': True,
+            'message': response
+        })
+    except Exception as e:
+        print(f"Error sending message: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to send message'
+        }), 500
+
+@main.route('/api/finish-conversation', methods=['POST'])
+@login_required
+@limiter.limit("10 per hour")
+def finish_conversation():
+    try:
+        data = request.json
+        request_id = data.get('request_id')
+        
+        feedback_request = FeedbackRequest.query.get_or_404(request_id)
+        if feedback_request.requestor_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+        
+        thread_id = feedback_request.session_data
+        coach = init_feedback_coach()
+        
+        # Get conversation summary
+        summary = coach.get_conversation_summary(thread_id)
+        feedback_request.feedback_prompt = summary
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'summary': summary
+        })
+    except Exception as e:
+        print(f"Error finishing conversation: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to finish conversation'
+        }), 500
 
 @main.route('/profile', methods=['GET', 'POST'])
 @login_required
