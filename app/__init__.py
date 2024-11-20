@@ -1,8 +1,9 @@
-from flask import Flask
+from flask import Flask, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from config import Config
 from flask_login import LoginManager
+import os
 
 # Initialize extensions
 login_manager = LoginManager()
@@ -25,6 +26,21 @@ def create_app():
     def load_user(user_id):
         from .models import User  # Import the User model
         return User.query.get(int(user_id))  # Load user by ID
+
+    # Force HTTPS and handle www/non-www redirects
+    @app.before_request
+    def before_request():
+        # Only enforce HTTPS in production
+        if os.environ.get('FLASK_ENV') == 'production':
+            # If not HTTPS, redirect to HTTPS
+            if not request.is_secure:
+                url = request.url.replace('http://', 'https://', 1)
+                return redirect(url, code=301)
+
+            # Redirect www to non-www
+            if request.host.startswith('www.'):
+                url = request.url.replace('www.', '', 1)
+                return redirect(url, code=301)
 
     # Import and register blueprints
     from .routes import main
