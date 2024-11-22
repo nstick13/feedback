@@ -3,29 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Feedback App{% endblock %}</title>
+    <title>{% block title %}WDTT{% endblock %} - What Do They Think</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --wdtt-primary: #1a73e8;
+            --wdtt-secondary: #34a853;
+            --wdtt-accent: #fbbc05;
+            --wdtt-text: #202124;
+        }
+        
+        body {
+            color: var(--wdtt-text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, var(--wdtt-primary), #185abc) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .navbar-brand span {
+            color: var(--wdtt-accent);
+            font-weight: 700;
+        }
+        
+        .nav-link {
+            font-weight: 500;
+        }
+        
+        .btn-primary {
+            background-color: var(--wdtt-primary);
+            border-color: var(--wdtt-primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: #185abc;
+            border-color: #185abc;
+        }
+        
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid #e0e0e0;
+        }
+        
+        .card-title {
+            color: var(--wdtt-primary);
+            font-weight: 600;
+        }
+        
+        main {
+            min-height: calc(100vh - 70px);
+            padding: 2rem 0;
+        }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.home') }}">Feedback App</a>
+            <a class="navbar-brand" href="{{ url_for('main.home') }}">
+                <i class="bi bi-lightbulb"></i> WDT<span>T</span>
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.home') }}">Home</a>
+                        <a class="nav-link" href="{{ url_for('main.home') }}">
+                            <i class="bi bi-house"></i> Home
+                        </a>
                     </li>
                     {% if current_user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.dashboard') }}">Dashboard</a>
+                        <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                            <i class="bi bi-grid"></i> Dashboard
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.request_feedback') }}">Request Feedback</a>
+                        <a class="nav-link" href="{{ url_for('main.request_feedback') }}">
+                            <i class="bi bi-chat-dots"></i> Request Feedback
+                        </a>
                     </li>
                     {% endif %}
                 </ul>
@@ -48,7 +114,9 @@
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('auth.login') }}">Sign In</a>
+                        <a class="nav-link" href="{{ url_for('main.login') }}">
+                            <i class="bi bi-box-arrow-in-right"></i> Sign In
+                        </a>
                     </li>
                     {% endif %}
                 </ul>

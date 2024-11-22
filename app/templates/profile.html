@@ -1,14 +1,16 @@
 {% extends "base.html" %}
 
+{% block title %}Profile - WDTT{% endblock %}
+
 {% block content %}
 <div class="container py-5">
     <div class="row">
         <div class="col-lg-8 mx-auto">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
+            <div class="card shadow-lg rounded-4">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, var(--wdtt-primary), #185abc);">
                     <h3 class="mb-0">Profile Settings</h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             {% for category, message in messages %}
@@ -21,14 +23,15 @@
                     {% endwith %}
                     
                     <form id="profile-form" method="POST">
+                        {{ form.csrf_token }}
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <label for="first_name" class="form-label">First Name</label>
-                                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ current_user.first_name or '' }}" required>
+                                {{ form.first_name.label(class="form-label") }}
+                                {{ form.first_name(class="form-control", value=current_user.first_name or '') }}
                             </div>
                             <div class="col-md-6">
-                                <label for="last_name" class="form-label">Last Name</label>
-                                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ current_user.last_name or '' }}" required>
+                                {{ form.last_name.label(class="form-label") }}
+                                {{ form.last_name(class="form-control", value=current_user.last_name or '') }}
                             </div>
                         </div>
 
@@ -45,40 +48,57 @@
                         </div>
 
                         <div class="mb-4">
-                            <label for="company" class="form-label">Company</label>
-                            <input type="text" class="form-control" id="company" name="company" value="{{ current_user.company or '' }}">
+                            {{ form.company.label(class="form-label") }}
+                            {{ form.company(class="form-control", value=current_user.company or '') }}
                         </div>
 
                         <div class="mb-4">
-                            <label for="role" class="form-label">Role</label>
-                            <input type="text" class="form-control" id="role" name="role" value="{{ current_user.role or '' }}">
+                            {{ form.role.label(class="form-label") }}
+                            {{ form.role(class="form-control", value=current_user.role or '') }}
                         </div>
 
                         <hr class="my-4">
 
                         <div class="mb-4">
-                            <h5>Change Password</h5>
+                            <h5 class="mb-3">Change Password</h5>
                             <div class="mb-3">
-                                <label for="current_password" class="form-label">Current Password</label>
-                                <input type="password" class="form-control" id="current_password" name="current_password">
+                                {{ form.current_password.label(class="form-label") }}
+                                <div class="input-group">
+                                    {{ form.current_password(class="form-control") }}
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('current_password')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="mb-3">
-                                <label for="new_password" class="form-label">New Password</label>
-                                <input type="password" class="form-control" id="new_password" name="new_password">
+                                {{ form.new_password.label(class="form-label") }}
+                                <div class="input-group">
+                                    {{ form.new_password(class="form-control") }}
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('new_password')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="mb-3">
-                                <label for="confirm_password" class="form-label">Confirm New Password</label>
-                                <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                                {{ form.confirm_password.label(class="form-label") }}
+                                <div class="input-group">
+                                    {{ form.confirm_password(class="form-control") }}
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirm_password')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <button type="submit" class="btn btn-lg" style="background: linear-gradient(135deg, var(--wdtt-primary), #185abc); color: white;">
+                                Save Changes
+                            </button>
                         </div>
                     </form>
                 </div>
                 <div class="card-footer text-muted">
-                    <small>Last updated: {{ current_user.updated_at.strftime('%B %d, %Y %I:%M %p') }}</small>
+                    <small>Last updated: {{ current_user.updated_at.strftime('%B %d, %Y %I:%M %p') if current_user.updated_at else 'Never' }}</small>
                 </div>
             </div>
         </div>
@@ -86,58 +106,73 @@
 </div>
 
 <script>
+function togglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    const button = input.nextElementSibling;
+    const icon = button.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+}
+
 document.getElementById('profile-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    
-    const newPassword = document.getElementById('new_password').value;
-    const confirmPassword = document.getElementById('confirm_password').value;
-    
-    if (newPassword && newPassword !== confirmPassword) {
-        alert('New passwords do not match!');
-        return;
-    }
     
     const formData = new FormData(this);
     
     fetch('/profile', {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-success alert-dismissible fade show';
-            alert.innerHTML = `
-                ${data.message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-            this.insertBefore(alert, this.firstChild);
-            
+            showAlert('success', data.message);
             // Clear password fields
             document.getElementById('current_password').value = '';
             document.getElementById('new_password').value = '';
             document.getElementById('confirm_password').value = '';
         } else {
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-danger alert-dismissible fade show';
-            alert.innerHTML = `
-                ${data.message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-            this.insertBefore(alert, this.firstChild);
+            showAlert('danger', data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        const alert = document.createElement('div');
-        alert.className = 'alert alert-danger alert-dismissible fade show';
-        alert.innerHTML = `
-            An error occurred. Please try again.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-        this.insertBefore(alert, this.firstChild);
+        showAlert('danger', 'An error occurred. Please try again.');
     });
 });
+
+function showAlert(type, message) {
+    // Remove any existing alerts
+    const existingAlerts = document.querySelectorAll('.alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    // Create new alert
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Insert at the top of the form
+    const form = document.getElementById('profile-form');
+    form.insertBefore(alert, form.firstChild);
+    
+    // Auto-dismiss success messages after 5 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            alert.remove();
+        }, 5000);
+    }
+}
 </script>
 {% endblock %}

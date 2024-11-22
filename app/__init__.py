@@ -1,7 +1,7 @@
 from flask import Flask, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from config import Config
+from config import get_config
 from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -19,9 +19,9 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
-def create_app():
+def create_app(config_name='development'):
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(get_config(config_name))
 
     # Initialize extensions with the app
     db.init_app(app)  # Initialize SQLAlchemy with the Flask app

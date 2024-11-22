@@ -62,6 +62,16 @@ class FeedbackRequest(db.Model):
     unique_link = db.Column(db.String(200), nullable=True)
     session_data = db.Column(db.Text, nullable=True)  # For OpenAI session insights
     feedback_prompt = db.Column(db.Text, nullable=True)  # Summary of AI-generated prompt
+    personal_message = db.Column(db.Text, nullable=True)  # Personal message to the recipient
 
     def __repr__(self):
         return f'<FeedbackRequest {self.request_recipient}>'
+
+class FeedbackTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    prompt = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    def __repr__(self):
+        return f'<FeedbackTemplate {self.id}>'

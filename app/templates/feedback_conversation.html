@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Request Feedback - WDTT{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-lg rounded-4">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, var(--wdtt-primary), #185abc);">
+                    <h3 class="mb-0">Request Feedback</h3>
+                </div>
+                <div class="card-body p-4">
+                    <div id="conversation-container" class="mb-4">
+                        <!-- Messages will be added here -->
+                    </div>
+                    
+                    <div id="message-input" class="message-input">
+                        <form id="message-form" class="d-flex gap-2">
+                            <input type="text" id="user-message" class="form-control" placeholder="Type your message..." required>
+                            <button type="submit" class="btn btn-primary">Send</button>
+                        </form>
+                    </div>
+
+                    <!-- Summary and Recipients Form (hidden by default) -->
+                    <div id="summary-section" class="d-none">
+                        <div class="alert alert-info mb-4">
+                            <h4 class="alert-heading">Feedback Request Summary</h4>
+                            <div id="feedback-summary" class="mb-3"></div>
+                        </div>
+                        
+                        <form id="recipients-form" class="mb-4">
+                            <div class="mb-3">
+                                <label for="recipients" class="form-label">Recipient Emails</label>
+                                <textarea id="recipients" class="form-control" rows="3" 
+                                    placeholder="Enter email addresses (one per line)"></textarea>
+                                <div class="form-text">Enter each email address on a new line</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">Send Feedback Requests</button>
+                                <button type="button" id="save-template" class="btn btn-outline-primary">Save as Template</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+let requestId = null;
+
+// Start conversation when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    requestId = {{ context.request_id }};
+    
+    // Display initial message if provided
+    {% if context.initial_message %}
+        addMessage("{{ context.initial_message | safe }}", 'assistant');
+    {% endif %}
+});
+
+function addMessage(message, sender) {
+    const container = document.getElementById('conversation-container');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}-message mb-3`;
+    
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'message-icon';
+    iconDiv.innerHTML = sender === 'assistant' ? 
+        '<i class="bi bi-robot"></i>' : 
+        '<i class="bi bi-person-circle"></i>';
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.innerHTML = marked.parse(message);
+    
+    messageDiv.appendChild(iconDiv);
+    messageDiv.appendChild(contentDiv);
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+// Handle message form submission
+document.getElementById('message-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const messageInput = document.getElementById('user-message');
+    const message = messageInput.value.trim();
+    
+    if (!message) return;
+    
+    // Add user message to conversation
+    addMessage(message, 'user');
+    messageInput.value = '';
+    
+    // Send message to server
+    fetch('/api/send-message', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            message: message,
+            request_id: requestId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addMessage(data.message, 'assistant');
+            
+            // Check if conversation is complete
+            if (data.conversation_complete) {
+                // Hide message input and show summary section
+                document.getElementById('message-input').classList.add('d-none');
+                finishConversation();
+            }
+        } else {
+            showError('Failed to send message');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showError('An error occurred');
+    });
+});
+
+function finishConversation() {
+    // Show summary section
+    document.getElementById('summary-section').classList.remove('d-none');
+    
+    // Get the last assistant message as the summary
+    const messages = document.querySelectorAll('.assistant-message');
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage) {
+        document.getElementById('feedback-summary').innerHTML = lastMessage.querySelector('.message-content').innerHTML;
+    }
+}
+
+function showError(message) {
+    // Implementation of error display
+    console.error(message);
+    alert(message);  // For now, just show an alert
+}
+</script>
+
+<style>
+#conversation-container {
+    height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    margin-bottom: 1rem;
+}
+
+.message {
+    display: flex;
+    gap: 1rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.user-message {
+    background-color: #e9ecef;
+}
+
+.assistant-message {
+    background-color: #fff;
+}
+
+.message-icon {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--wdtt-primary);
+    color: white;
+    border-radius: 50%;
+}
+
+.message-content {
+    flex-grow: 1;
+    padding: 0.5rem;
+}
+
+.message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.message-content ul, .message-content ol {
+    margin: 0.5rem 0 0.5rem 1.5rem;
+    padding: 0;
+}
+
+.message-content h1, .message-content h2, .message-content h3,
+.message-content h4, .message-content h5, .message-content h6 {
+    margin: 1rem 0 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

@@ -64,6 +64,25 @@ class FeedbackCoach:
             raise
 
     @retry_on_error()
+    def check_conversation_readiness(self, thread_id):
+        """Check if the conversation has enough information for a feedback request"""
+        try:
+            # Add a system message asking to evaluate conversation completeness
+            self.add_message(
+                thread_id,
+                "SYSTEM: Please evaluate if we have gathered enough specific information about the feedback request. "
+                "Consider: (1) The specific context or situation, (2) Clear focus areas for feedback, "
+                "(3) Any relevant background or constraints. "
+                "If we have enough information, end your response with '**Complete: True**'. "
+                "If we need more information, ask a specific follow-up question."
+            )
+            
+            return self.get_assistant_response(thread_id)
+        except Exception as e:
+            logger.error(f"Error checking conversation readiness: {str(e)}")
+            raise
+
+    @retry_on_error()
     def get_assistant_response(self, thread_id, timeout=60):
         """Run the assistant and get its response with timeout"""
         try:
@@ -99,8 +118,25 @@ class FeedbackCoach:
             messages = self.client.beta.threads.messages.list(thread_id=thread_id)
             latest_message = messages.data[0]
             response = latest_message.content[0].text.value
+
+            # Log the raw response
+            logger.info(f"Raw assistant response: {response}")
+
+            # Check if the response indicates conversation completion
+            # Look for both "**Complete: True**" and ", Complete: True"
+            conversation_complete = "**Complete: True**" in response or ", Complete: True" in response
+            logger.info(f"Conversation complete: {conversation_complete}")
+            
+            if conversation_complete:
+                # Remove all completion markers
+                response = response.replace("**Complete: True**", "").replace(", Complete: True", "").replace(", Complete: False", "").strip()
+                logger.info(f"Cleaned response: {response}")
+
             logger.info(f"Got response from assistant for thread {thread_id}")
-            return response
+            return {
+                'message': response,
+                'conversation_complete': conversation_complete
+            }
 
         except Exception as e:
             logger.error(f"Error getting assistant response for thread {thread_id}: {str(e)}")
@@ -108,18 +144,22 @@ class FeedbackCoach:
 
     @retry_on_error()
     def get_conversation_summary(self, thread_id):
-        """Get a summary of the conversation"""
+        """Get a summary of the conversation for the feedback request"""
         try:
-            # Add a system message requesting a summary
+            # Add a system message asking for a summary
             self.add_message(
                 thread_id,
-                "Please provide a concise summary of our conversation about what kind of feedback the user is looking for. "
-                "This summary will be used to guide the feedback providers."
+                "SYSTEM: Please provide a clear, structured summary of the feedback request. "
+                "Include key areas to focus on and any specific aspects mentioned. "
+                "Format it in markdown with appropriate headers and bullet points."
             )
             
-            return self.get_assistant_response(thread_id)
+            # Get the summary response
+            response_data = self.get_assistant_response(thread_id)
+            return response_data['message']
+            
         except Exception as e:
-            logger.error(f"Error getting conversation summary for thread {thread_id}: {str(e)}")
+            logger.error(f"Error getting conversation summary: {str(e)}")
             raise
 
 def init_feedback_coach():

@@ -1,98 +1,145 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feedback App - Home</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <!-- Add Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.home') }}">Feedback App</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.home') }}">Home</a>
-                    </li>
-                    {% if current_user.is_authenticated %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">Dashboard</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.request_feedback') }}">Request Feedback</a>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.auth') }}">Sign In</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
+{% block title %}Home{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        padding: 4rem 0;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 100%);
+        border-radius: 24px;
+        margin: 2rem 0;
+    }
+    
+    .hero-title {
+        color: var(--wdtt-text);
+        font-weight: 700;
+        font-size: 3.5rem;
+        line-height: 1.2;
+        margin-bottom: 1.5rem;
+    }
+    
+    .hero-title span {
+        color: var(--wdtt-primary);
+    }
+    
+    .hero-subtitle {
+        color: #5f6368;
+        font-size: 1.25rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+    
+    .feature-card {
+        border-radius: 16px;
+        border: 1px solid #e0e0e0;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        overflow: hidden;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+    
+    .feature-icon {
+        font-size: 2rem;
+        color: var(--wdtt-primary);
+        margin-bottom: 1rem;
+    }
+    
+    .feature-card .card-title {
+        color: var(--wdtt-text);
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+    
+    .feature-card .card-text {
+        color: #5f6368;
+        line-height: 1.6;
+    }
+    
+    .btn-hero {
+        padding: 1rem 2rem;
+        font-weight: 500;
+        border-radius: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-hero.btn-primary {
+        background: linear-gradient(135deg, var(--wdtt-primary), #185abc);
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .btn-hero.btn-outline-primary {
+        border: 2px solid var(--wdtt-primary);
+        color: var(--wdtt-primary);
+    }
+    
+    .btn-hero.btn-outline-primary:hover {
+        background: var(--wdtt-primary);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
     <!-- Hero Section -->
-    <div class="container mt-5">
+    <div class="hero-section">
         <div class="row align-items-center">
-            <div class="col-lg-6">
-                <h1 class="display-4">Welcome to Feedback App</h1>
-                <p class="lead">Get valuable feedback on your work from peers and experts.</p>
-                <p class="mb-4">Our platform makes it easy to request, give, and receive constructive feedback to help you grow and improve.</p>
+            <div class="col-lg-6 px-4 px-lg-5">
+                <h1 class="hero-title">What Do <span>They Think?</span></h1>
+                <p class="hero-subtitle">Get meaningful feedback that helps you grow. Our AI-powered platform makes it easy to request, receive, and learn from feedback that matters.</p>
                 {% if not current_user.is_authenticated %}
-                    <div class="d-grid gap-2 d-md-flex">
-                        <a href="{{ url_for('main.auth') }}" class="btn btn-primary btn-lg me-md-2">Get Started</a>
+                    <div class="d-grid gap-3 d-md-flex">
+                        <a href="{{ url_for('main.auth') }}" class="btn btn-hero btn-primary">Get Started</a>
+                        <a href="#features" class="btn btn-hero btn-outline-primary">Learn More</a>
                     </div>
                 {% else %}
-                    <div class="d-grid gap-2 d-md-flex">
-                        <a href="{{ url_for('main.request_feedback') }}" class="btn btn-primary btn-lg me-md-2">Request Feedback</a>
-                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary btn-lg">View Dashboard</a>
+                    <div class="d-grid gap-3 d-md-flex">
+                        <a href="{{ url_for('main.request_feedback') }}" class="btn btn-hero btn-primary">Request Feedback</a>
+                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-hero btn-outline-primary">View Dashboard</a>
                     </div>
                 {% endif %}
             </div>
-            <div class="col-lg-6">
+            <div class="col-lg-6 mt-5 mt-lg-0">
                 <img src="{{ url_for('static', filename='images/feedback-illustration.svg') }}" alt="Feedback Illustration" class="img-fluid">
             </div>
         </div>
     </div>
 
     <!-- Features Section -->
-    <div class="container mt-5">
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">Request Feedback</h5>
-                        <p class="card-text">Easily submit your work and request feedback from peers or experts in your field.</p>
-                    </div>
+    <div class="row g-4 py-5" id="features">
+        <div class="col-md-4">
+            <div class="card feature-card h-100">
+                <div class="card-body text-center p-4">
+                    <i class="bi bi-chat-dots feature-icon"></i>
+                    <h5 class="card-title">AI-Guided Requests</h5>
+                    <p class="card-text">Our AI coach helps you craft specific, actionable feedback requests that get better responses.</p>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">Track Progress</h5>
-                        <p class="card-text">Monitor your improvement over time with our comprehensive dashboard.</p>
-                    </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card feature-card h-100">
+                <div class="card-body text-center p-4">
+                    <i class="bi bi-graph-up feature-icon"></i>
+                    <h5 class="card-title">Track Growth</h5>
+                    <p class="card-text">Monitor your progress and see how feedback helps you improve over time.</p>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">Give Feedback</h5>
-                        <p class="card-text">Help others improve by providing constructive feedback on their work.</p>
-                    </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card feature-card h-100">
+                <div class="card-body text-center p-4">
+                    <i class="bi bi-lightbulb feature-icon"></i>
+                    <h5 class="card-title">Smart Insights</h5>
+                    <p class="card-text">Get AI-powered insights that help you understand and act on the feedback you receive.</p>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+</div>
+{% endblock %}

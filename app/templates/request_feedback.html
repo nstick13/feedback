@@ -1,18 +1,470 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Request Feedback</title>
-</head>
-<body>
-    <h1>Request Feedback</h1>
-    <form action="/submit-feedback-request" method="POST">
-        <label for="recipient">Recipient Email:</label>
-        <input type="email" id="recipient" name="recipient" required><br><br>
+{% extends "base.html" %}
 
-        <label for="message">Personal Message:</label><br>
-        <textarea id="message" name="message" rows="4" cols="50" placeholder="Optional message..."></textarea><br><br>
+{% block title %}Request Feedback{% endblock %}
 
-        <button type="submit">Send Request</button>
-    </form>
-</body>
-</html>
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        background-color: #f8f9fa;
+    }
+    .message {
+        margin-bottom: 1rem;
+        padding: 1rem 1.25rem;
+        border-radius: 12px;
+        max-width: 85%;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+    .user-message {
+        background: linear-gradient(135deg, var(--wdtt-primary), #185abc);
+        color: white;
+        margin-left: auto;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .assistant-message {
+        background-color: white;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .assistant-message ul, .assistant-message ol {
+        margin: 0.75rem 0 0.75rem 1.5rem;
+        padding: 0;
+    }
+    .assistant-message p {
+        margin: 0.75rem 0;
+    }
+    .assistant-message strong {
+        color: var(--wdtt-primary);
+        font-weight: 600;
+    }
+    .assistant-message h1, .assistant-message h2, .assistant-message h3, 
+    .assistant-message h4, .assistant-message h5, .assistant-message h6 {
+        margin: 0.75rem 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--wdtt-text);
+    }
+    .chat-input {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+    }
+    .chat-input textarea {
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        resize: none;
+        overflow-y: auto;
+        min-height: 42px;
+        max-height: 200px;
+        line-height: 1.5;
+    }
+    .chat-input textarea:focus {
+        outline: none;
+        border-color: var(--wdtt-primary);
+        box-shadow: 0 0 0 2px rgba(var(--wdtt-primary-rgb), 0.25);
+    }
+    .chat-input button {
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        border-radius: 8px;
+    }
+    .summary-container {
+        display: none;
+        margin-top: 2rem;
+    }
+    .step-indicator {
+        display: flex;
+        margin-bottom: 2.5rem;
+        gap: 2rem;
+    }
+    .step {
+        flex: 1;
+        text-align: center;
+        padding: 1.25rem;
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+    .step.active {
+        background: #e8f0fe;
+        border-color: var(--wdtt-primary);
+        font-weight: 600;
+        color: var(--wdtt-primary);
+    }
+    .step.completed {
+        background: #e6f4ea;
+        border-color: var(--wdtt-secondary);
+        color: var(--wdtt-secondary);
+    }
+    .step:not(:last-child):after {
+        content: '';
+        position: absolute;
+        right: -2rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 2rem;
+        height: 2px;
+        background: #e0e0e0;
+    }
+    .step.completed:after {
+        background: var(--wdtt-secondary);
+    }
+    .feedback-prompt {
+        background: #fff8e1;
+        border-left: 4px solid var(--wdtt-accent);
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    .action-buttons button {
+        flex: 1;
+    }
+    #finish-button {
+        background-color: var(--wdtt-secondary);
+        border-color: var(--wdtt-secondary);
+    }
+    #finish-button:hover {
+        background-color: #2d9447;
+        border-color: #2d9447;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Request Feedback</h2>
+    
+    <!-- Step Indicator -->
+    <div class="step-indicator">
+        <div class="step active" id="step-conversation">
+            <i class="bi bi-chat-dots"></i>
+            Refine Request
+        </div>
+        <div class="step" id="step-review">
+            <i class="bi bi-eye"></i>
+            Review & Send
+        </div>
+    </div>
+    
+    <!-- AI Conversation Interface -->
+    <div class="card mb-4" id="conversation-card">
+        <div class="card-body">
+            <h5 class="card-title">Let's craft your feedback request</h5>
+            <p class="card-text">I'll help you articulate what kind of feedback you're looking for.</p>
+            
+            <div id="chat-container" class="chat-container">
+                <!-- Messages will be added here -->
+            </div>
+            
+            <div class="chat-input">
+                <textarea id="user-input" class="form-control" placeholder="Type your message... (Shift+Enter for new line)" rows="1"></textarea>
+                <button id="send-button" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary and Action Buttons -->
+    <div id="summary-container" class="summary-container">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Your Feedback Request is Ready!</h5>
+                <p class="card-text text-muted mb-4">Here's the refined version of your feedback request. You can save it as a template for future use and/or send it to recipients now.</p>
+                
+                <div class="feedback-prompt mb-4">
+                    <h6 class="mb-2">AI-Refined Feedback Request:</h6>
+                    <div id="feedback-summary"></div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button type="button" class="btn btn-outline-primary" onclick="saveAsTemplate()">
+                        <i class="bi bi-bookmark-plus"></i> Save as Template
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="showRecipientForm()">
+                        <i class="bi bi-send"></i> Send to Recipients
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recipient Form (Initially Hidden) -->
+        <div id="recipient-form" class="card mb-4" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">Send to Recipients</h5>
+                <form id="feedback-form">
+                    <div class="mb-3">
+                        <label for="recipient-emails" class="form-label">
+                            <i class="bi bi-envelope"></i> Recipient Emails
+                        </label>
+                        <textarea class="form-control" id="recipient-emails" rows="3" 
+                                placeholder="Enter email addresses (one per line)" required></textarea>
+                        <div class="form-text">Enter one email address per line</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="personal-message" class="form-label">
+                            <i class="bi bi-pencil"></i> Personal Message (Optional)
+                        </label>
+                        <textarea class="form-control" id="personal-message" rows="3" 
+                                placeholder="Add a personal note to accompany your feedback request..."></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button type="button" class="btn btn-outline-secondary" onclick="restartConversation()">
+                            <i class="bi bi-arrow-counterclockwise"></i> Start Over
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send"></i> Send Feedback Requests
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+let currentRequestId = null;
+let currentSummary = null;
+
+// Start conversation when page loads
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('/api/start-feedback-conversation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        console.log('Initial conversation data:', data);
+        
+        if (data.success) {
+            currentRequestId = data.request_id;
+            // Add initial message
+            if (data.message && data.message.trim()) {
+                console.log('Adding initial message:', data.message);
+                addMessage(data.message, 'assistant');
+            } else {
+                console.warn('No initial message received');
+            }
+        } else {
+            console.error('Failed to start conversation:', data);
+            showError('Failed to start conversation');
+        }
+    } catch (error) {
+        console.error('Error starting conversation:', error);
+        showError('An error occurred');
+    }
+});
+
+// Auto-resize textarea as user types
+document.getElementById('user-input').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
+// Send message when button is clicked or Enter is pressed (unless Shift is held)
+document.getElementById('send-button').addEventListener('click', sendMessage);
+document.getElementById('user-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();  // Prevent default to avoid newline
+        sendMessage();
+    }
+});
+
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // Clear input
+    input.value = '';
+    
+    // Add user message to chat
+    addMessage(message, 'user');
+    
+    try {
+        const response = await fetch('/api/send-message', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                request_id: currentRequestId,
+                message: message
+            })
+        });
+        const data = await response.json();
+        console.log('Received response:', data);
+        
+        if (data.success) {
+            addMessage(data.message, 'assistant');
+            
+            // Check if conversation is complete
+            if (data.conversation_complete) {
+                console.log('Conversation complete, getting summary...');
+                // Get the summary and show actions
+                const summaryResponse = await fetch('/api/finish-conversation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        request_id: currentRequestId
+                    })
+                });
+                const summaryData = await summaryResponse.json();
+                console.log('Received summary:', summaryData);
+                
+                if (summaryData.success) {
+                    currentSummary = summaryData.summary;
+                    showSummaryAndActions();
+                }
+            }
+        } else {
+            console.error('Failed to send message:', data.message);
+        }
+    } catch (error) {
+        console.error('Error sending message:', error);
+    }
+}
+
+function addMessage(message, sender) {
+    const container = document.getElementById('chat-container');
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('message', `${sender}-message`);
+    
+    // Use marked to convert markdown to HTML for assistant messages
+    if (sender === 'assistant') {
+        messageDiv.innerHTML = marked.parse(message);
+    } else {
+        messageDiv.textContent = message;
+    }
+    
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+function showSummaryAndActions() {
+    // Update step indicators
+    document.getElementById('step-conversation').classList.remove('active');
+    document.getElementById('step-conversation').classList.add('completed');
+    document.getElementById('step-review').classList.add('active');
+    
+    // Hide chat input
+    document.querySelector('.chat-input').style.display = 'none';
+    
+    // Show summary container and update content
+    const summaryContainer = document.getElementById('summary-container');
+    const feedbackSummary = document.getElementById('feedback-summary');
+    
+    feedbackSummary.innerHTML = marked.parse(currentSummary);
+    summaryContainer.style.display = 'block';
+    
+    // Scroll to summary
+    summaryContainer.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function saveAsTemplate() {
+    try {
+        const response = await fetch('/api/save-feedback-template', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                request_id: currentRequestId,
+                template: currentSummary
+            })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Template saved successfully!');
+        } else {
+            alert('Failed to save template: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error saving template:', error);
+        alert('An error occurred while saving the template');
+    }
+}
+
+function showRecipientForm() {
+    document.getElementById('recipient-form').style.display = 'block';
+    document.getElementById('recipient-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+function restartConversation() {
+    window.location.reload();
+}
+
+// Handle feedback form submission
+document.getElementById('feedback-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const recipientEmails = document.getElementById('recipient-emails').value
+        .split('\n')
+        .map(email => email.trim())
+        .filter(email => email);
+        
+    if (recipientEmails.length === 0) {
+        alert('Please enter at least one recipient email address');
+        return;
+    }
+    
+    const personalMessage = document.getElementById('personal-message').value;
+    
+    try {
+        const response = await fetch('/api/submit-feedback-request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                request_id: currentRequestId,
+                recipients: recipientEmails,
+                personal_message: personalMessage
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Redirect to dashboard with a success message
+            window.location.href = '/dashboard?message=' + encodeURIComponent('Feedback requests sent successfully!');
+        } else {
+            alert(data.message || 'Failed to submit feedback request');
+        }
+    } catch (error) {
+        console.error('Error submitting feedback request:', error);
+        alert('An error occurred while submitting the feedback request');
+    }
+});
+
+function showError(message) {
+    alert(message);
+}
+</script>
+{% endblock %}
